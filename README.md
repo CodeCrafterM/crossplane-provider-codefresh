@@ -1,34 +1,34 @@
-# provider-template
+# CodeFresh CrossPlane Provider
 
-`provider-template` is a minimal [Crossplane](https://crossplane.io/) Provider
-that is meant to be used as a template for implementing new Providers. It comes
-with the following features that are meant to be refactored:
+## Description
+This is a boilerplate contribution for developing a CrossPlane provider for the CodeFresh CI/CD Platform. It includes a generic CodeFresh client for CRUD operations on different resources and a basic project CRD and controller with unit testing for the observe method.
 
-- A `ProviderConfig` type that only points to a credentials `Secret`.
-- A `MyType` resource type that serves as an example managed resource.
-- A managed resource controller that reconciles `MyType` objects and simply
-  prints their configuration in its `Observe` method.
 
-## Developing
+## Setup
 
-1. Use this repository as a template to create a new one.
-1. Run `make submodules` to initialize the "build" Make submodule we use for CI/CD.
-1. Rename the provider by running the following command:
-```shell
-  export provider_name=MyProvider # Camel case, e.g. GitHub
-  make provider.prepare provider=${provider_name}
-```
-4. Add your new type by running the following command:
-```shell
-  export group=sample # lower case e.g. core, cache, database, storage, etc.
-  export type=MyType # Camel casee.g. Bucket, Database, CacheCluster, etc.
-  make provider.addtype provider=${provider_name} group=${group} kind=${type}
-```
-5. Replace the *sample* group with your new group in apis/{provider}.go
-5. Replace the *mytype* type with your new type in internal/controller/{provider}.go
-5. Replace the default controller and ProviderConfig implementations with your own
-5. Run `make reviewable` to run code generation, linters, and tests.
-5. Run `make build` to build the provider.
+(TODO: Add specific setup instructions, including environment requirements, installation steps, and any configuration needed.)
+
+## How to Use
+
+Examples of how to use the provider will be included, demonstrating how to manage CodeFresh resources through CrossPlane custom resources. (TODO: Add specific examples and usage instructions).
+
+## Development
+
+Contributions to the provider are welcome! (TODO: Provide instructions on how to set up a development environment, run tests, and contribute code.)
+
+## Code of Conduct
+This project adheres to a code of conduct. By participating, you are expected to uphold this code. (TODO: Provide a link to the full code of conduct.)
+
+# TODO
+-  Enhance the CodeFresh client with more features.
+-  Expand the unit tests to cover more methods.
+-  Add support for additional CodeFresh resources.
+-  Provide detailed documentation and examples.
+
+
+This README serves as a starting point and will be updated as the project evolves.
+
+# Resources
 
 Refer to Crossplane's [CONTRIBUTING.md] file for more information on how the
 Crossplane community prefers to work. The [Provider Development][provider-dev]

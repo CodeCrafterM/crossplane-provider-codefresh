@@ -1,4 +1,4 @@
-module github.com/crossplane/provider-template
+module crossplane-provider-codefresh
 
 go 1.20
 

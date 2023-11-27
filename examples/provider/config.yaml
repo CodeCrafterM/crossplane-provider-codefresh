@@ -2,19 +2,19 @@ apiVersion: v1
 kind: Secret
 metadata:
   namespace: crossplane-system
-  name: example-provider-secret
+  name: codefresh-provider-secret
 type: Opaque
 data:
-  # credentials: BASE64ENCODED_PROVIDER_CREDS
+# credentials: BASE64ENCODED_PROVIDER_CREDS
 ---
-apiVersion: template.crossplane.io/v1alpha1
+apiVersion: codefresh.crossplane.io/v1alpha1
 kind: ProviderConfig
 metadata:
-  name: example
+  name: codefresh
 spec:
   credentials:
     source: Secret
     secretRef:
       namespace: crossplane-system
-      name: example-provider-secret
+      name: codefresh-provider-secret
       key: credentials
