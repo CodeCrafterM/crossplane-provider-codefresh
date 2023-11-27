@@ -1,0 +1,18 @@
+apiVersion: resource.codefresh.crossplane.io/v1alpha1
+kind: Project
+metadata:
+  name: codefresh-project
+spec:
+  forProvider:
+    configurableField: test
+    projectName: "CrossplaneProvider5"
+    projectTags:
+      - "value1"
+      - "value2"
+    projectVariables:
+      - key: "variable2"
+        value: "value2"
+      - key: "variable3"
+        value: "value3"
+  providerConfigRef:
+    name: codefresh
