@@ -30,6 +30,33 @@ type ProjectVariable struct {
 	Value string `json:"value"`
 }
 
+type ProjectMetadata struct {
+	CreatedAt string `json:"createdAt"`
+}
+
+type ProjectDetails struct {
+	AccountID                   string            `json:"accountId"`
+	ProjectName                 string            `json:"projectName"`
+	UpdatedAt                   string            `json:"updatedAt"`
+	ProjectMetadata             ProjectMetadata   `json:"metadata"`
+	ProjectImage                string            `json:"image"`
+	ProjectTags                 []string          `json:"tags"`
+	ProjectVariables            []ProjectVariable `json:"variables"`
+	ProjectTotalPipelinesNumber int               `json:"pipelinesNumber"`
+	ProjectID                   string            `json:"id"`
+	IsFavorite                  bool              `json:"favorite"`
+}
+
+type ProjectCreateParams struct {
+	ProjectName      string            `json:"projectName,omitempty"`
+	ProjectTags      []string          `json:"tags,omitempty"`
+	ProjectVariables []ProjectVariable `json:"variables,omitempty"`
+}
+
+type CreateProjectResponse struct {
+	ProjectID string `json:"id"`
+}
+
 // ProjectParameters are the configurable fields of a Project.
 type ProjectParameters struct {
 	ConfigurableField string `json:"configurableField"`

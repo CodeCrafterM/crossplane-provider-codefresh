@@ -14,44 +14,49 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package project
+package pipeline
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/crossplane/crossplane-runtime/pkg/connection"
-	"github.com/crossplane/crossplane-runtime/pkg/controller"
-	"github.com/crossplane/crossplane-runtime/pkg/event"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
-	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/crossplane/crossplane-runtime/pkg/connection"
+	"github.com/crossplane/crossplane-runtime/pkg/controller"
+	"github.com/crossplane/crossplane-runtime/pkg/event"
+	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
+	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/pkg/resource"
+
 	"crossplane-provider-codefresh/apis/resource/v1alpha1"
 	apisv1alpha1 "crossplane-provider-codefresh/apis/v1alpha1"
 	"crossplane-provider-codefresh/internal/features"
+	"crossplane-provider-codefresh/internal/helpers"
 
 	codefreshclient "crossplane-provider-codefresh/internal/client"
 	"crossplane-provider-codefresh/internal/constants"
-	"crossplane-provider-codefresh/internal/helpers"
 )
 
 const (
-	errNotProject            = "managed resource is not a Project custom resource"
-	errCreatingProject       = "error creating project in CodeFresh"
-	errUpdatingProject       = "error updating project in CodeFresh"
-	errUpdatingProjectStatus = "error updating project status with project ID"
-	errDeletingProject       = "error deleting project in CodeFresh"
+	errNotPipeline        = "managed resource is not a Pipeline custom resource"
+	errorFetchingPipeline = "Error occurred while fetching pipeline details"
+	errCreatingPipeline   = "error creating pipeline"
+	errUpdatingPipeline   = "error updating pipeline"
+	errDeletingPipeline   = "something went wrong while deleting the pipeline"
+
+	debugObservingPipelineResource = "Observing Pipeline resource"
+	debugPipelineIDNotFound        = "Pipeline ID not found in status; pipeline resource not created yet"
 )
 
-// Setup adds a controller that reconciles Project managed resources.
+// Setup adds a controller that reconciles Pipeline managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options) error {
-	name := managed.ControllerName(v1alpha1.ProjectGroupKind)
+	name := managed.ControllerName(v1alpha1.PipelineGroupKind)
 
 	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
 	if o.Features.Enabled(features.EnableAlphaExternalSecretStores) {
@@ -59,7 +64,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 	}
 
 	r := managed.NewReconciler(mgr,
-		resource.ManagedKind(v1alpha1.ProjectGroupVersionKind),
+		resource.ManagedKind(v1alpha1.PipelineGroupVersionKind),
 		managed.WithExternalConnecter(&connector{
 			kube:  mgr.GetClient(),
 			usage: resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
@@ -77,7 +82,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		Named(name).
 		WithOptions(o.ForControllerRuntime()).
 		WithEventFilter(resource.DesiredStateChanged()).
-		For(&v1alpha1.Project{}).
+		For(&v1alpha1.Pipeline{}).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }
 
@@ -91,12 +96,12 @@ type connector struct {
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	cr, ok := mg.(*v1alpha1.Project)
+	cr, ok := mg.(*v1alpha1.Pipeline)
 	if !ok {
-		return nil, errors.New(errNotProject)
+		return nil, errors.New(errNotPipeline)
 	}
 
-	c.logger.Info("Connecting to CodeFresh", "project", cr.GetName())
+	c.logger.Info("Connecting to CodeFresh", "pipeline", cr.GetName())
 
 	if err := c.usage.Track(ctx, mg); err != nil {
 		return nil, errors.Wrap(err, constants.ErrTrackPCUsage)
@@ -145,43 +150,43 @@ func newExternal(client client.Client, logger logging.Logger, service codefreshc
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
-	cr, ok := mg.(*v1alpha1.Project)
+	cr, ok := mg.(*v1alpha1.Pipeline)
 	if !ok {
-		return managed.ExternalObservation{}, errors.New(errNotProject)
+		c.logger.Debug(errNotPipeline, "actualType", fmt.Sprintf("%T", mg))
+		return managed.ExternalObservation{}, errors.New(errNotPipeline)
 	}
 
-	if !ok {
-		return managed.ExternalObservation{}, errors.New(constants.ErrExpectedCodeFreshClient)
-	}
+	c.logger.Debug(debugObservingPipelineResource, "name", cr.GetName())
 
-	projectID := cr.Status.AtProvider.ProjectID
-	if projectID == "" {
-		// No project ID means the project hasn't been created yet.
+	pipelineID := cr.Status.AtProvider.ID
+	if pipelineID == "" {
+		c.logger.Debug(debugPipelineIDNotFound)
+		// No pipeline ID means the pipeline hasn't been created yet.
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	}
 
-	var projectDetails v1alpha1.ProjectDetails
-	err := c.service.GetResource(ctx, "projects", projectID, &projectDetails)
+	var pipelineDetails v1alpha1.PipelineDetails
+	err := c.service.GetResource(ctx, "pipelines", pipelineID, &pipelineDetails)
 	if err != nil {
-		// Check if the error is due to the project not being found
-		if errors.Is(err, codefreshclient.ErrResourceNotFound) || helpers.IsResourceNotFoundErr(err, "Project") {
+		c.logger.Debug(errorFetchingPipeline, "error", err, "pipelineID", pipelineID)
+		// Check if the error is due to the pipeline not being found
+		if errors.Is(err, codefreshclient.ErrResourceNotFound) || helpers.IsResourceNotFoundErr(err, "Pipeline") {
 			return managed.ExternalObservation{ResourceExists: false}, nil
 		}
 		return managed.ExternalObservation{}, err
 	}
 
-	var variables []v1alpha1.ProjectVariable //nolint:prealloc
-	for _, v := range cr.Spec.ForProvider.ProjectVariables {
-		variables = append(variables, v1alpha1.ProjectVariable{Key: v.Key, Value: v.Value})
+	nameUpToDate := false
+	if len(pipelineDetails.Docs) > 0 {
+		nameUpToDate = pipelineDetails.Docs[0].Metadata.Name == cr.Spec.ForProvider.Metadata.Name
+		c.logger.Debug("Comparing pipeline names", "observedName", pipelineDetails.Docs[0].Metadata.Name, "expectedName", cr.Spec.ForProvider.Metadata.Name)
+	} else {
+		c.logger.Debug("No documents found in pipeline details")
 	}
 
-	// Check if the project name, tags, and variables are up to date
-	nameUpToDate := projectDetails.ProjectName == cr.Spec.ForProvider.ProjectName
-	tagsUpToDate := helpers.AreTagsEqual(projectDetails.ProjectTags, cr.Spec.ForProvider.ProjectTags)
-	varsUpToDate := helpers.AreSlicesEqual(projectDetails.ProjectVariables, variables)
+	resourceUpToDate := nameUpToDate
 
-	resourceUpToDate := nameUpToDate && tagsUpToDate && varsUpToDate
-
+	c.logger.Debug("Observed pipeline resource", "resourceUpToDate", resourceUpToDate)
 	return managed.ExternalObservation{
 		ResourceExists:    true,
 		ResourceUpToDate:  resourceUpToDate,
@@ -190,44 +195,41 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	cr, ok := mg.(*v1alpha1.Project)
+	cr, ok := mg.(*v1alpha1.Pipeline)
 	if !ok {
-		return managed.ExternalCreation{}, errors.New(errNotProject)
+		return managed.ExternalCreation{}, errors.New(errNotPipeline)
 	}
 
-	if !ok {
-		return managed.ExternalCreation{}, errors.New(constants.ErrExpectedCodeFreshClient)
+	// Set up the parameters for pipeline creation
+	params := v1alpha1.PipelineCreateParams{
+		Metadata: v1alpha1.PipelineMetadata{
+			Name: cr.Spec.ForProvider.Metadata.Name,
+		},
+		Spec: v1alpha1.PipelineSpecStruct{
+			Triggers:  cr.Spec.ForProvider.Spec.Triggers,
+			Steps:     cr.Spec.ForProvider.Spec.Steps,
+			Stages:    cr.Spec.ForProvider.Spec.Stages,
+			Variables: cr.Spec.ForProvider.Spec.Variables,
+			Options:   cr.Spec.ForProvider.Spec.Options,
+			// Contexts:  cr.Spec.ForProvider.Spec.Contexts,
+		},
 	}
 
-	var variables []v1alpha1.ProjectVariable //nolint:prealloc
-	for _, v := range cr.Spec.ForProvider.ProjectVariables {
-		variables = append(variables, v1alpha1.ProjectVariable{
-			Key:   v.Key,
-			Value: v.Value,
-		})
-	}
-
-	// Set up the parameters for project creation
-	params := v1alpha1.ProjectCreateParams{
-		ProjectName:      cr.Spec.ForProvider.ProjectName,
-		ProjectTags:      cr.Spec.ForProvider.ProjectTags,
-		ProjectVariables: variables,
-	}
-
-	// Response struct to hold the created project's ID
-	var respData v1alpha1.CreateProjectResponse
+	// Response struct to hold the created pipeline's ID
+	var respData v1alpha1.CreatePipelineResponse
 
 	// Use the generic CreateResource method
-	if err := c.service.CreateResource(ctx, "projects", params, &respData); err != nil {
-		return managed.ExternalCreation{}, errors.Wrap(err, errCreatingProject)
+	if err := c.service.CreateResource(ctx, "pipelines", params, &respData); err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreatingPipeline)
 	}
 
-	// Store the project ID in the status
-	cr.Status.AtProvider.ProjectID = respData.ProjectID
+	// Store the pipeline ID in the status
+	cr.Status.AtProvider.ID = respData.Metadata.ID
+	/*	cr.Status.AtProvider.Name = respData.Metadata.Name */
 
-	// Update the status of the resource with the new project ID
+	// Update the status of the resource with the new pipeline ID
 	if err := c.client.Status().Update(ctx, cr); err != nil {
-		return managed.ExternalCreation{}, errors.Wrap(err, errUpdatingProjectStatus)
+		return managed.ExternalCreation{}, errors.Wrap(err, errUpdatingPipeline)
 	}
 
 	return managed.ExternalCreation{
@@ -236,52 +238,64 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	cr, ok := mg.(*v1alpha1.Project)
+	cr, ok := mg.(*v1alpha1.Pipeline)
 	if !ok {
-		return managed.ExternalUpdate{}, errors.New(errNotProject)
+		return managed.ExternalUpdate{}, errors.New(errNotPipeline)
 	}
+
+	fmt.Printf("Updating: %+v", cr)
 
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(constants.ErrExpectedCodeFreshClient)
 	}
 
-	// Convert ProjectVariables to the expected format
-	var variables []v1alpha1.ProjectVariable //nolint:prealloc
-	for _, v := range cr.Spec.ForProvider.ProjectVariables {
-		variables = append(variables, v1alpha1.ProjectVariable{Key: v.Key, Value: v.Value})
-	}
+	/*	updateParams := v1alpha1.PipelineCreateParams{
+			Metadata: v1alpha1.PipelineMetadata{
+				Name: cr.Spec.ForProvider.Metadata.Name,
+			},
+			Spec: v1alpha1.PipelineSpecStruct{
+				Triggers:  cr.Spec.ForProvider.Spec.Triggers,
+				Steps:     cr.Spec.ForProvider.Spec.Steps,
+				Stages:    cr.Spec.ForProvider.Spec.Stages,
+				Variables: cr.Spec.ForProvider.Spec.Variables,
+				Options:   cr.Spec.ForProvider.Spec.Options,
+				// Contexts:  cr.Spec.ForProvider.Spec.Contexts,
+			},
+		}
 
-	// Define the update parameters including tags and variables
-	updateParams := map[string]interface{}{
-		"projectName": cr.Spec.ForProvider.ProjectName,
-		"tags":        cr.Spec.ForProvider.ProjectTags,
-		"variables":   variables,
-	}
-
-	// Update the resource
-	err := c.service.UpdateResource(ctx, "projects", cr.Status.AtProvider.ProjectID, updateParams, nil)
-	if err != nil {
-		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdatingProject)
-	}
+		// Update the resource
+		err := c.service.UpdateResource(ctx, "pipelines", cr.Status.AtProvider.ID, updateParams, nil)
+		if err != nil {
+			return managed.ExternalUpdate{}, errors.Wrap(err, errUpdatingPipeline)
+		}*/
 
 	return managed.ExternalUpdate{}, nil
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
-	cr, ok := mg.(*v1alpha1.Project)
-	if !ok {
-		return errors.New(errNotProject)
-	}
-
+	cr, ok := mg.(*v1alpha1.Pipeline)
 	if !ok {
 		return errors.New(constants.ErrExpectedCodeFreshClient)
 	}
 
 	// Delete the resource
-	err := c.service.DeleteResource(ctx, "projects", cr.Status.AtProvider.ProjectID)
+	err := c.service.DeleteResource(ctx, "pipelines", cr.Status.AtProvider.ID)
 	if err != nil {
-		return errors.Wrap(err, errDeletingProject)
+		return errors.Wrap(err, errDeletingPipeline)
 	}
 
 	return nil
 }
+
+/*func transformTriggers(triggers []v1alpha1.PipelineTrigger) []v1alpha1.PipelineTrigger {
+	var transformed []v1alpha1.PipelineTrigger
+	for _, t := range triggers {
+		// Copy the trigger and modify Contexts
+		newTrigger := t
+		newTrigger.Contexts = [][]v1alpha1.NullType{{v1alpha1.NullType{}}}
+
+		transformed = append(transformed, newTrigger)
+	}
+	return transformed
+}
+*/
