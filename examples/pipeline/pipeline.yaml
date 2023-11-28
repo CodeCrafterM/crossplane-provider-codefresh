@@ -16,3 +16,83 @@ spec:
         value: "value3"
   providerConfigRef:
     name: codefresh
+---
+apiVersion: resource.codefresh.crossplane.io/v1alpha1
+kind: Pipeline
+metadata:
+  name: sample-codefresh-pipeline
+spec:
+  forProvider:
+    metadata:
+      name: "sample-pipeline"
+    spec:
+      triggers:
+        - name: "trigger1"
+          type: "git"
+          repo: "CodeCrafterM/crossplane-provider-codefresh"
+          events:
+            - "push"
+            - "pullrequest"
+          pullRequestAllowForkEvents: true
+          commentRegex: "/^((dev_msaadi)$).*/g"
+          branchRegex: "/^((dev))-.*/gi"
+          branchRegexInput: "multiselect"
+          provider: "github"
+          disabled: false
+          options:
+            noCache: false
+            noCfCache: false
+            resetVolume: false
+            enableNotifications: true
+          context: "default"
+          contexts: []
+          variables:
+            - key: "BUILD_NUMBER"
+              value: "123"
+      cronTriggers:
+        - event: "cron"
+          name: "nightly-build"
+          type: "cron"
+          message: "Nightly build triggered"
+          expression: "0 0 * * *"
+          verified: true
+          status: "active"
+          disabled: false
+          gitTriggerId: "git-trigger-001"
+          branch: "dev"
+          options:
+            noCache: true
+            noCfCache: true
+            resetVolume: true
+            enableNotifications: true
+          variables:
+            - key: "DEPLOY_ENV"
+              value: "staging"
+      steps:
+        build:
+          name: "build"
+          values:
+            - key: "image"
+              value: "node:latest"
+        test:
+          name: "test"
+          values:
+            - key: "tests"
+              value: "unit"
+      stages:
+        - "build"
+        - "test"
+      variables:
+        - key: "GLOBAL_VAR"
+          value: "value1"
+      options:
+        noCache: false
+        noCfCache: false
+        resetVolume: false
+        enableNotifications: true
+      contexts:
+        - values:
+            - key: "global-context"
+              value: "value2"
+  providerConfigRef:
+    name: codefresh

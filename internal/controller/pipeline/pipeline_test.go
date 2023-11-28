@@ -14,16 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package project
+package pipeline
 
 import (
 	"context"
+	"crossplane-provider-codefresh/internal/client"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
-	"crossplane-provider-codefresh/apis/resource/v1alpha1"
-	"crossplane-provider-codefresh/internal/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
@@ -39,6 +37,9 @@ import (
 // https://github.com/crossplane/crossplane/blob/master/CONTRIBUTING.md#contributing-code
 
 func TestObserve(t *testing.T) {
+	type fields struct {
+	}
+
 	type args struct {
 		ctx context.Context
 		mg  resource.Managed
@@ -51,77 +52,12 @@ func TestObserve(t *testing.T) {
 
 	cases := map[string]struct {
 		reason string
+		fields fields
 		args   args
 		setup  func(*client.MockCodeFreshAPIClient)
 		want   want
 	}{
-		"ProjectDoesNotExist": {
-			reason: "Should return ResourceDoesNotExist when project does not exist.",
-			args: args{
-				ctx: context.TODO(),
-				mg: &v1alpha1.Project{
-					Status: v1alpha1.ProjectStatus{
-						AtProvider: v1alpha1.ProjectObservation{
-							ProjectID: "non-existent-project",
-						},
-					},
-				},
-			},
-			setup: func(m *client.MockCodeFreshAPIClient) {
-				m.MockGetResourceResponse = nil
-				m.MockGetResourceErr = client.ErrResourceNotFound
-			},
-			want: want{
-				o: managed.ExternalObservation{
-					ResourceExists: false,
-				},
-				err: nil,
-			},
-		},
-		"ProjectExists": {
-			reason: "Should return ResourceExists when project exists.",
-			args: args{
-				ctx: context.TODO(),
-				mg: &v1alpha1.Project{
-					Spec: v1alpha1.ProjectSpec{
-						ForProvider: v1alpha1.ProjectParameters{
-							ProjectName: "TestProject",
-							ProjectTags: []string{"tag1", "tag2"},
-							ProjectVariables: []v1alpha1.ProjectVariable{
-								{Key: "var1", Value: "value1"},
-								{Key: "var2", Value: "value2"},
-							},
-						},
-					},
-					Status: v1alpha1.ProjectStatus{
-						AtProvider: v1alpha1.ProjectObservation{
-							ProjectID: "existing-project",
-						},
-					},
-				},
-			},
-			setup: func(m *client.MockCodeFreshAPIClient) {
-				m.MockGetResourceResponse = &v1alpha1.ProjectDetails{
-					ProjectID:   "existing-project",
-					ProjectName: "TestProject",
-					ProjectTags: []string{"tag1", "tag2"},
-					ProjectVariables: []v1alpha1.ProjectVariable{
-						{Key: "var1", Value: "value1"},
-						{Key: "var2", Value: "value2"},
-					},
-				}
-				m.MockGetResourceErr = nil
-			},
-			want: want{
-				o: managed.ExternalObservation{
-					ResourceExists:    true,
-					ResourceUpToDate:  true,
-					ConnectionDetails: managed.ConnectionDetails{}, // this line is updated
-				},
-				err: nil,
-			},
-		},
-		// Add more test cases as needed.
+		// TODO: Add test cases.
 	}
 
 	for name, tc := range cases {

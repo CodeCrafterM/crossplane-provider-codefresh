@@ -21,6 +21,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"crossplane-provider-codefresh/internal/controller/config"
+	"crossplane-provider-codefresh/internal/controller/pipeline"
 	"crossplane-provider-codefresh/internal/controller/project"
 )
 
@@ -30,6 +31,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 	for _, setup := range []func(ctrl.Manager, controller.Options) error{
 		config.Setup,
 		project.Setup,
+		pipeline.Setup,
 	} {
 		if err := setup(mgr, o); err != nil {
 			return err

@@ -2,14 +2,14 @@ package client
 
 import (
 	"context"
-	"crossplane-provider-codefresh/internal/constants"
+	"crossplane-provider-codefresh/apis/resource/v1alpha1"
 )
 
 type MockCodeFreshAPIClient struct {
 	MockCheckResourceExistsResponse bool
 	MockCheckResourceExistsErr      error
 
-	MockGetResourceResponse *constants.ProjectDetails
+	MockGetResourceResponse *v1alpha1.ProjectDetails
 	MockGetResourceErr      error
 
 	MockCreateResourceResponse interface{}
@@ -38,7 +38,7 @@ func (m *MockCodeFreshAPIClient) GetResource(ctx context.Context, resourceType, 
 	// Cast the response to the expected type
 	switch resourceType {
 	case "projects":
-		*response.(*constants.ProjectDetails) = *m.MockGetResourceResponse
+		*response.(*v1alpha1.ProjectDetails) = *m.MockGetResourceResponse
 	default:
 		return nil
 	}
