@@ -46,12 +46,12 @@ import (
 const (
 	errNotPipeline        = "managed resource is not a Pipeline custom resource"
 	errorFetchingPipeline = "Error occurred while fetching pipeline details"
-	errCreatingPipline    = "error creating pipeline"
+	errCreatingPipeline   = "error creating pipeline"
 	errUpdatingPipeline   = "error updating pipeline"
 	errDeletingPipeline   = "something went wrong while deleting the pipeline"
 
-	debugObseringPiplineResource = "Observing Pipeline resource"
-	debugPiplineIDNotFound       = "Pipeline ID not found in status; pipeline resource not created yet"
+	debugObservingPipelineResource = "Observing Pipeline resource"
+	debugPipelineIDNotFound        = "Pipeline ID not found in status; pipeline resource not created yet"
 )
 
 // Setup adds a controller that reconciles Pipeline managed resources.
@@ -156,11 +156,11 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotPipeline)
 	}
 
-	c.logger.Debug(debugObseringPiplineResource, "name", cr.GetName())
+	c.logger.Debug(debugObservingPipelineResource, "name", cr.GetName())
 
 	pipelineID := cr.Status.AtProvider.ID
 	if pipelineID == "" {
-		c.logger.Debug(debugPiplineIDNotFound)
+		c.logger.Debug(debugPipelineIDNotFound)
 		// No pipeline ID means the pipeline hasn't been created yet.
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	}
@@ -220,7 +220,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	// Use the generic CreateResource method
 	if err := c.service.CreateResource(ctx, "pipelines", params, &respData); err != nil {
-		return managed.ExternalCreation{}, errors.Wrap(err, errCreatingPipline)
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreatingPipeline)
 	}
 
 	// Store the pipeline ID in the status
@@ -243,29 +243,31 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotPipeline)
 	}
 
+	fmt.Printf("Updating: %+v", cr)
+
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(constants.ErrExpectedCodeFreshClient)
 	}
 
-	updateParams := v1alpha1.PipelineCreateParams{
-		Metadata: v1alpha1.PipelineMetadata{
-			Name: cr.Spec.ForProvider.Metadata.Name,
-		},
-		Spec: v1alpha1.PipelineSpecStruct{
-			Triggers:  cr.Spec.ForProvider.Spec.Triggers,
-			Steps:     cr.Spec.ForProvider.Spec.Steps,
-			Stages:    cr.Spec.ForProvider.Spec.Stages,
-			Variables: cr.Spec.ForProvider.Spec.Variables,
-			Options:   cr.Spec.ForProvider.Spec.Options,
-			// Contexts:  cr.Spec.ForProvider.Spec.Contexts,
-		},
-	}
+	/*	updateParams := v1alpha1.PipelineCreateParams{
+			Metadata: v1alpha1.PipelineMetadata{
+				Name: cr.Spec.ForProvider.Metadata.Name,
+			},
+			Spec: v1alpha1.PipelineSpecStruct{
+				Triggers:  cr.Spec.ForProvider.Spec.Triggers,
+				Steps:     cr.Spec.ForProvider.Spec.Steps,
+				Stages:    cr.Spec.ForProvider.Spec.Stages,
+				Variables: cr.Spec.ForProvider.Spec.Variables,
+				Options:   cr.Spec.ForProvider.Spec.Options,
+				// Contexts:  cr.Spec.ForProvider.Spec.Contexts,
+			},
+		}
 
-	// Update the resource
-	err := c.service.UpdateResource(ctx, "pipelines", cr.Status.AtProvider.ID, updateParams, nil)
-	if err != nil {
-		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdatingPipeline)
-	}
+		// Update the resource
+		err := c.service.UpdateResource(ctx, "pipelines", cr.Status.AtProvider.ID, updateParams, nil)
+		if err != nil {
+			return managed.ExternalUpdate{}, errors.Wrap(err, errUpdatingPipeline)
+		}*/
 
 	return managed.ExternalUpdate{}, nil
 }

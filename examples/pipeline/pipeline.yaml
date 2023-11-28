@@ -5,7 +5,7 @@ metadata:
 spec:
   forProvider:
     configurableField: test
-    projectName: "CrossplaneProvider5"
+    projectName: "CrossplaneProvider3"
     projectTags:
       - "value1"
       - "value2"
@@ -24,7 +24,7 @@ metadata:
 spec:
   forProvider:
     metadata:
-      name: "sample-pipeline"
+      name: "sample-codefresh-pipeline"
     spec:
       triggers:
         - name: "trigger1"
